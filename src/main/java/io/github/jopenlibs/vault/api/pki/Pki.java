@@ -59,6 +59,51 @@ public class Pki extends OperationsBase {
     }
 
     /**
+     * <p>Operation to read the issuer certificate using the PKI backend.</p>
+     *
+     * <p>This version of the method uses default values for all optional settings.  Example
+     * usage:</p>
+     *
+     * <blockquote>
+     * <pre>{@code
+     * final VaultConfig config = new VaultConfig.address(...).token(...).build();
+     * final Vault vault = Vault.create(config);
+     * final PkiResponse response = vault.pki().readIssuerCertificate(true);
+     *
+     * assertEquals(204, response.getRestResponse().getStatus());
+     * }</pre>
+     * </blockquote>
+     *
+     * @param pem {@code true} if the certificate should be returned in PEM format,
+     * {@code false} for DER format
+     * @return A container for the information returned by Vault
+     * @throws VaultException If any error occurs or unexpected response is received from Vault
+     */
+    public PkiResponse readIssuerCertificate(final boolean pem) throws VaultException {
+        return retry(attempt -> {
+            final RestResponse restResponse = getRest()
+                    .url(String.format("%s/v1/%s/ca%s", config.getAddress(), this.mountPath, pem ? "/pem" : ""))
+                    .header("X-Vault-Namespace", this.nameSpace)
+                    .header("X-Vault-Request", "true")
+                    .connectTimeoutSeconds(config.getOpenTimeout())
+                    .readTimeoutSeconds(config.getReadTimeout())
+                    .sslVerification(config.getSslConfig().isVerify())
+                    .sslContext(config.getSslConfig().getSslContext())
+                    .get();
+
+            // Validate restResponse
+            // TODO: handle warnings
+            if (restResponse.getStatus() != 204 && restResponse.getStatus() != 200) {
+                throw new VaultException(
+                        "Vault responded with HTTP status code: " + restResponse.getStatus(),
+                        restResponse.getStatus());
+            }
+
+            return new PkiResponse(restResponse, attempt);
+        });
+    }
+
+    /**
      * <p>Operation to create an role using the PKI backend.  Relies on an authentication token
      * being present in the <code>VaultConfig</code> instance.</p>
      *
